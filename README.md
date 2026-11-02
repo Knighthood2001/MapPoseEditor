@@ -1,6 +1,20 @@
-# MapPoseEdit
+# MapPoseEditor
+
+## 在线使用
+
+**直接打开：[https://knighthood2001.github.io/MapPoseEditor/](https://knighthood2001.github.io/MapPoseEditor/)**
+
+无需安装软件或启动 ROS / Nav2。打开网页后，同时选择地图 YAML 与对应 PGM / PNG 图片，即可选点、设置朝向、复制位姿及导出配置。
+地图文件只在访问者自己的浏览器中处理，不会上传至服务器。在线版首次打开需要网络；下载完整仓库后仍可离线使用。
+
+## 离线使用
 
 直接双击本目录的 `index.html`。不需要安装软件、不需要启动网页服务器、ROS 或 Nav2，也不需要联网。
+
+## 网页发布
+
+本仓库使用 GitHub Pages，从 `main` 分支根目录发布。推送到 `main` 后，GitHub 会自动更新在线版本。
+`.nojekyll` 用于直接发布 HTML、JavaScript 和 CSS，无需安装依赖或执行构建。
 
 ## 加载地图
 
