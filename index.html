@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self';">
+  <title>叉车 · 离线地图选点</title>
+  <link rel="stylesheet" href="style.css"><script defer src="map-core.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">↗</span><div>叉车地图选点<span class="brand-sub">MAP POSE EDITOR</span></div></div>
+    <span class="offline"><i></i>本地离线 · 无需 ROS</span>
+    <div class="header-actions"><button id="openBtn" class="primary">＋ 加载地图</button><button id="projectBtn" disabled>保存工程</button></div>
+    <input id="fileInput" type="file" multiple accept=".yaml,.yml,.pgm,.png,.jpg,.jpeg,.bmp,.webp,.json" hidden>
+  </header>
+  <main>
+    <aside class="left-panel">
+      <section>
+        <div class="eyebrow">01 / 地图</div><h2 id="mapName">尚未加载地图</h2>
+        <p class="muted" id="mapHint">一起选择 Nav2 地图 YAML 和对应图片，也可以拖入页面。</p>
+        <div class="meta-grid"><span>坐标系</span><b>map</b><span>图像尺寸</span><b id="dimensions">—</b><span>分辨率</span><b id="resolutionLabel">—</b><span>图像原点</span><b id="originLabel">—</b></div>
+        <label class="checkbox"><input id="showAxes" type="checkbox" checked>显示 map 原点与坐标轴</label>
+        <p class="muted" id="originStatus">map 原点为 (0, 0)，不同于 YAML 的图像原点。</p>
+        <details id="metaDetails"><summary>查看 / 编辑地图参数</summary>
+          <label>分辨率 · m/px<input id="metaResolution" type="number" value="0.05" min="0.000001" step="0.01"></label>
+          <div class="two-col"><label>原点 X · m<input id="metaX" type="number" value="0" step="0.1"></label><label>原点 Y · m<input id="metaY" type="number" value="0" step="0.1"></label></div>
+          <label>原点 yaw · 弧度<input id="metaYaw" type="number" value="0" step="0.01"></label>
+          <button id="applyMeta">应用地图参数</button>
+        </details>
+      </section>
+      <section>
+        <div class="eyebrow">02 / 任务点位</div><h2>选择要设置的点</h2>
+        <button id="pickupTab" class="point-card selected" data-point="pickup"><span class="number blue">1</span><span><strong>取货交接位</strong><small id="pickupSummary">未设置 · 车辆对叉前的位置</small></span><span class="point-check" id="pickupCheck">○</span></button>
+        <button id="dropoffTab" class="point-card" data-point="dropoff"><span class="number orange">2</span><span><strong>入库终点</strong><small id="dropoffSummary">未设置 · UP 状态 base_link</small></span><span class="point-check" id="dropoffCheck">○</span></button>
+        <div class="help-card"><b>按住左键，拖出朝向</b><p>按下位置为目标点，箭头指向车辆 +X 方向。货叉侧为相反的 −X。</p><p>滚轮缩放 · 空格或右键拖动平移</p></div>
+      </section>
+      <section class="staging-section">
+        <label class="checkbox"><input id="showStaging" type="checkbox" checked>显示入库交接候选</label>
+        <label class="inline-label">距终点 <input id="stagingDistance" type="number" min="0.1" max="10" value="1.7" step="0.1"> m</label>
+        <p class="muted">沿最终车头方向向外偏移；候选朝向为最终朝向 ±90°。</p>
+      </section>
+      <div class="footer-note">仅用于确定地图位姿，不验证路径可达性或碰撞。地图坐标需与实车定位使用同一张地图。</div>
+    </aside>
+    <section class="workspace">
+      <div class="canvas-toolbar"><div class="segmented"><button id="selectTool" class="active">↗ 选点</button><button id="panTool">✥ 平移</button></div><span class="toolbar-tip">位置 + 朝向，一次拖动完成</span><div class="view-actions"><button id="undoBtn" disabled title="撤销选点">↶</button><button id="zoomOut" title="缩小">−</button><span id="zoomLabel">100%</span><button id="zoomIn" title="放大">＋</button><button id="originBtn" disabled>定位原点</button><button id="fitBtn">适应地图</button></div></div>
+      <div id="canvasWrap" tabindex="0"><canvas id="mapCanvas" aria-label="地图选点画布"></canvas>
+        <div id="emptyState"><div class="empty-icon">⌖</div><h1>在地图上确定下一站</h1><p>加载地图，选择位置和朝向。<br>直接得到 map 坐标，不必启动导航。</p><button id="emptyOpen" class="primary">选择 YAML 和地图图片</button><button id="demoBtn" class="text-button">先体验示例地图 →</button><small>支持 PGM P2/P5、PNG、JPG · 所有文件仅在本机处理</small></div>
+        <div id="dragOverlay" hidden>松开以加载地图或工程</div>
+        <div id="mapBadge" hidden><span class="dot"></span><span id="mapBadgeText">map</span></div>
+      </div>
+      <div class="statusbar"><span id="cursorPosition">移动鼠标查看 map 坐标</span><span id="cellStatus">—</span><span id="statusHint">未加载地图</span></div>
+    </section>
+    <aside class="right-panel">
+      <div class="eyebrow">03 / 位姿</div><div class="title-row"><h2 id="selectedTitle">取货交接位</h2><button id="clearPoint" class="text-button" disabled>清除</button></div>
+      <div class="reference-label" id="referenceLabel">车辆对叉前的交接位姿</div>
+      <div class="pose-inputs"><label>X <span>m</span><input id="poseX" type="number" step="0.01" placeholder="在地图上选点" disabled></label><label>Y <span>m</span><input id="poseY" type="number" step="0.01" placeholder="在地图上选点" disabled></label><label class="full">朝向 yaw <span>度 °</span><input id="poseDeg" type="number" step="1" placeholder="拖动设置朝向" disabled></label></div>
+      <div class="angle-presets"><button data-angle="0">0°</button><button data-angle="90">90°</button><button data-angle="180">180°</button><button data-angle="-90">−90°</button></div>
+      <div class="value-row"><span>yaw · 弧度</span><code id="yawRad">—</code></div>
+      <div class="quaternion"><h3>四元数 · orientation</h3><div class="two-col"><div><span>x</span><code>0</code></div><div><span>y</span><code>0</code></div><div><span>z</span><code id="quatZ">—</code></div><div><span>w</span><code id="quatW">—</code></div></div></div>
+      <button id="copyTuple" class="wide" disabled>复制 (x, y, yaw) · 弧度</button>
+      <button id="copyTupleDeg" class="wide" disabled>复制 (x, y, yaw) · 角度</button>
+      <button id="copyPose" class="wide" disabled>复制 ROS PoseStamped</button>
+      <div id="candidateInfo" class="candidate-info" hidden></div>
+      <section class="export-section"><h2>导出配置</h2><p class="muted">导出的 yaw 使用弧度，可直接填入现有任务配置。</p><button id="exportTask" class="primary wide" disabled>↓ 完整任务 task.yaml</button><button id="exportGoal" class="wide" disabled>↓ 入库目标 goal_task.yaml</button><p class="export-hint" id="exportHint">设置两个点后可导出完整任务。</p></section>
+      <details><summary>坐标与文件说明</summary><p class="muted">图像左上角不是 map 原点。换算会使用 YAML 的 resolution、origin 平移与 yaw，并翻转图像 Y 轴。</p><p class="muted">取货点是车辆交接位，入库点是最终 UP 状态 base_link 位姿，均不是托盘中心。箭头表示 +X，不表示货叉方向。</p><p class="muted">保存工程包含地图图像、参数和选点；下次加载 JSON 即可恢复。</p></details>
+    </aside>
+  </main>
+  <div id="toast" role="status" hidden></div>
+</body></html>
